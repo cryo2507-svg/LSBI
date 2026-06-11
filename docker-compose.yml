@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: blueprint
+      POSTGRES_USER: blueprint_user
+      POSTGRES_PASSWORD: blueprint_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://blueprint_user:blueprint_pass@db:5432/blueprint
+    depends_on:
+      - db
+    volumes:
+      - ./backend/cloned_repos:/app/cloned_repos
+
+  frontend:
+    build: ./frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
