@@ -20,7 +20,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
 
-  - type: static
+  - type: web
     name: lsbi-frontend
     runtime: static
     rootDir: frontend
