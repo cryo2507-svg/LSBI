@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
@@ -28,6 +29,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+def read_root():
+    return RedirectResponse(url="/docs")
+
 
 git_manager = GitRepositoryManager()
 
