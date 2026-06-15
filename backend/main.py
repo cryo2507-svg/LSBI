@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 
-from backend.database import engine, Base, get_db
+from backend.database import engine, Base, get_db, SessionLocal
 from backend.models import Repository, Commit, Component, Dependency
 from backend.schemas import (
     RepositoryCreate, RepositoryOut, CommitOut, 
@@ -37,8 +37,8 @@ def read_root():
 
 git_manager = GitRepositoryManager()
 
-def background_repo_indexing(repo_id: int, db_session: Session):
-    db = db_session
+def background_repo_indexing(repo_id: int):
+    db = SessionLocal()
     try:
         repo_db = db.query(Repository).filter(Repository.id == repo_id).first()
         if not repo_db:
@@ -73,10 +73,19 @@ def background_repo_indexing(repo_id: int, db_session: Session):
             
     except Exception as e:
         print(f"Failed indexing repo {repo_id}: {e}")
-        repo_db = db.query(Repository).filter(Repository.id == repo_id).first()
-        if repo_db:
-            repo_db.status = f"failed: {str(e)}"
-            db.commit()
+        db.rollback()
+        # Create a new session to record the failure to the database
+        try:
+            db_fail = SessionLocal()
+            repo_db = db_fail.query(Repository).filter(Repository.id == repo_id).first()
+            if repo_db:
+                repo_db.status = f"failed: {str(e)}"
+                db_fail.commit()
+            db_fail.close()
+        except Exception as fe:
+            print(f"Failed to save failure status for repo {repo_id}: {fe}")
+    finally:
+        db.close()
 
 def analyze_commit_sync(repo_db: Repository, commit_db: Commit, db: Session):
     try:
@@ -125,7 +134,7 @@ def create_repository(repo_in: RepositoryCreate, background_tasks: BackgroundTas
     db.refresh(db_repo)
     
     # Process commits & run initial analysis in background
-    background_tasks.add_task(background_repo_indexing, db_repo.id, db)
+    background_tasks.add_task(background_repo_indexing, db_repo.id)
     
     return db_repo
 
